@@ -1,0 +1,202 @@
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew",true))()
+local window = library:CreateWindow("Slient Assassins")
+
+local Settings = {
+    WalkSpeed = 16,
+    JumpPower = 50,
+    AutoEquip = true,
+    KillAura = false,
+    AuraRange = 20,
+    ESP = false
+}
+
+local lastSliderTime = 0
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function Notify(title, text)
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = title,
+        Text = text,
+        Icon = "rbxassetid://4483345998",
+        Duration = 2
+    })
+    local s = Instance.new("Sound", game:GetService("SoundService"))
+    s.SoundId = "rbxassetid://4590662766"
+    s.Volume = 0.5
+    s:Play()
+    game:GetService("Debris"):AddItem(s, 2)
+end
+
+local function KillTarget(target, dist)
+    local char = LocalPlayer.Character
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    if not tool or not target:FindFirstChild("HumanoidRootPart") then return end
+    
+    local args = {
+        [1] = "AttemptWeaponHit",
+        [2] = {
+            ["attackCycleData"] = {["knockbackMul"] = 1, ["slowMult"] = 0.2, ["slowTime"] = 1.5, ["lungeMul"] = 1, ["attackTime"] = 0.65},
+            ["knockback"] = 50,
+            ["shouldLock"] = true,
+            ["slowTime"] = 1.5,
+            ["shouldLunge"] = true,
+            ["isCritical"] = true,
+            ["weaponDefinition"] = {
+                ["attackCycle"] = {
+                    ["1"] = {["knockbackMul"] = 1, ["slowMult"] = 0.2, ["slowTime"] = 1.5, ["lungeMul"] = 1, ["attackTime"] = 0.65},
+                    ["2"] = {["lungeMul"] = 1, ["slowMult"] = 0.2, ["slowTime"] = 1.5, ["knockbackMul"] = 1, ["attackTime"] = 0.65},
+                    ["3"] = {["lungeMult"] = 0.75, ["slowMult"] = 0.2, ["slowTime"] = 1.5, ["knockbackMul"] = 1.5, ["attackTime"] = 0.716},
+                    ["4"] = {["lungeMul"] = 2.25, ["slowTime"] = 1.5, ["slowMult"] = 0.2, ["knockbackMul"] = 2.25, ["attackTime"] = 0.983}
+                },
+                ["attackOrder"] = {"1", "2", "3", "4"}
+            },
+            ["attackCooldown"] = 0.01,
+            ["shouldSlow"] = true,
+            ["lungeKnockback"] = 55,
+            ["hitboxSize"] = Vector3.new(120, 120, 120),
+            ["slowMult"] = 0.2,
+            ["cycleIndex"] = 1,
+            ["hitboxOffset"] = Vector3.new(0, 0, 0),
+            ["tool"] = tool,
+            ["damage"] = infinite
+        },
+        [3] = {
+            [1] = {
+                ["direction"] = (target.HumanoidRootPart.Position - char.HumanoidRootPart.Position).Unit,
+                ["isClosestEnemy"] = true,
+                ["origin"] = char.HumanoidRootPart.Position,
+                ["enemyModel"] = target,
+                ["distance"] = dist,
+                ["knockback"] = 0
+            }
+        }
+    }
+    task.spawn(function()
+        ReplicatedStorage.Events.GameRemoteFunction:InvokeServer(unpack(args))
+    end)
+end
+
+task.spawn(function()
+    while true do
+        if Settings.KillAura then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                for _, v in pairs(Players:GetPlayers()) do
+                    if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+                        local dist = (char.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < Settings.AuraRange then
+                            KillTarget(v.Character, dist)
+                        end
+                    end
+                end
+            end
+        end
+        task.wait(0.01)
+    end
+end)
+
+local function CreateESP(player)
+    player.CharacterAdded:Connect(function(character)
+        if Settings.ESP then
+            task.wait(0.5)
+            local root = character:WaitForChild("HumanoidRootPart", 5)
+            if root and not root:FindFirstChild("SlientESP") then
+                local box = Instance.new("BoxHandleAdornment")
+                box.Name = "SlientESP"
+                box.Size = Vector3.new(4, 6, 1)
+                box.AlwaysOnTop = true
+                box.ZIndex = 10
+                box.Adornee = root
+                box.Color3 = Color3.fromRGB(255, 0, 0)
+                box.Transparency = 0.5
+                box.Parent = root
+            end
+        end
+    end)
+end
+
+for _, v in pairs(Players:GetPlayers()) do
+    if v ~= LocalPlayer then CreateESP(v) end
+end
+
+Players.PlayerAdded:Connect(CreateESP)
+
+RunService.RenderStepped:Connect(function()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local root = v.Character.HumanoidRootPart
+            local existingESP = root:FindFirstChild("SlientESP")
+            
+            if Settings.ESP then
+                if not existingESP then
+                    local box = Instance.new("BoxHandleAdornment")
+                    box.Name = "SlientESP"
+                    box.Size = Vector3.new(4, 6, 1)
+                    box.AlwaysOnTop = true
+                    box.ZIndex = 10
+                    box.Adornee = root
+                    box.Color3 = Color3.fromRGB(255, 0, 0)
+                    box.Transparency = 0.5
+                    box.Parent = root
+                end
+            else
+                if existingESP then existingESP:Destroy() end
+            end
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+        char.Humanoid.WalkSpeed = Settings.WalkSpeed
+        char.Humanoid.JumpPower = Settings.JumpPower
+        if Settings.AutoEquip then
+            local bp = LocalPlayer:FindFirstChild("Backpack")
+            if bp then
+                local tool = bp:FindFirstChildOfClass("Tool")
+                if tool then tool.Parent = char end
+            end
+        end
+    end
+end)
+
+local mTab = window:AddFolder("Movement & Combat")
+mTab:AddToggle({text = "Auto Equip Sword", state = true, callback = function(v) 
+    Settings.AutoEquip = v 
+    Notify("EQUIP", "Auto Equip: " .. (v and "ON" or "OFF"))
+end})
+mTab:AddToggle({text = "ESP", state = false, callback = function(v) 
+    Settings.ESP = v 
+    Notify("VISUAL", "ESP: " .. (v and "ON" or "OFF")) 
+end})
+mTab:AddSlider({text = "Walk Speed", min = 16, max = 200, callback = function(v) 
+    Settings.WalkSpeed = v 
+    local t = tick() lastSliderTime = t
+    task.delay(0.3, function() if lastSliderTime == t then Notify("MOVEMENT", "Speed: " .. math.floor(v)) end end)
+end})
+mTab:AddSlider({text = "Jump Power", min = 50, max = 300, callback = function(v) 
+    Settings.JumpPower = v 
+    local t = tick() lastSliderTime = t
+    task.delay(0.3, function() if lastSliderTime == t then Notify("MOVEMENT", "Jump: " .. math.floor(v)) end end)
+end})
+
+local fTab = window:AddFolder("Farm")
+fTab:AddToggle({text = "KillAura", state = false, callback = function(v) 
+    Settings.KillAura = v 
+    Notify("COMBAT", "Aura: " .. (v and "ON" or "OFF")) 
+end})
+fTab:AddSlider({text = "Aura Range", min = 10, max = 5000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000, callback = function(v) 
+    Settings.AuraRange = v 
+    local t = tick() lastSliderTime = t
+    task.delay(0.3, function() if lastSliderTime == t then Notify("COMBAT", "Range: " .. math.floor(v)) end end)
+end})
+
+local iTab = window:AddFolder("Credit / Info")
+iTab:AddLabel({text = "Made By Era"})
+iTab:AddLabel({text = "Discord: era2006_"})
+
+library:Init()
