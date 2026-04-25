@@ -1,0 +1,121 @@
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+local hooked = false
+
+local writeu32 = buffer.writeu32
+local targetPacketId = 0x1B
+local targetValue = 0xFFFFFFFF
+
+local function rakhook(packet)
+    if packet.PacketId == targetPacketId then
+        local buf = packet.AsBuffer
+        writeu32(buf, 1, targetValue)
+        packet:SetData(buf)
+    end
+end
+
+local DesyncUI = Instance.new("ScreenGui")
+DesyncUI.Name = "DesyncUI"
+DesyncUI.ResetOnSpawn = false
+DesyncUI.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 220, 0, 110)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -55)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = DesyncUI
+
+local UICorner_Main = Instance.new("UICorner")
+UICorner_Main.CornerRadius = UDim.new(0, 10)
+UICorner_Main.Parent = MainFrame
+
+local UIStroke_Main = Instance.new("UIStroke")
+UIStroke_Main.Color = Color3.fromRGB(50, 50, 60)
+UIStroke_Main.Thickness = 1.5
+UIStroke_Main.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundTransparency = 1
+Title.Text = "Desync"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Parent = MainFrame
+
+local TitleLine = Instance.new("Frame")
+TitleLine.Size = UDim2.new(0.9, 0, 0, 1)
+TitleLine.Position = UDim2.new(0.05, 0, 0, 35)
+TitleLine.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+TitleLine.BorderSizePixel = 0
+TitleLine.Parent = MainFrame
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 160, 0, 40)
+ToggleBtn.Position = UDim2.new(0.5, -80, 0, 50)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+ToggleBtn.Text = "OFF"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 14
+ToggleBtn.Parent = MainFrame
+
+local UICorner_Btn = Instance.new("UICorner")
+UICorner_Btn.CornerRadius = UDim.new(0, 8)
+UICorner_Btn.Parent = ToggleBtn
+
+local dragging, dragInput, dragStart, startPos
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+local function setHookState(state)
+    hooked = state
+    
+    local targetColor, targetText
+    if hooked then
+        raknet.add_send_hook(rakhook)
+        targetColor = Color3.fromRGB(40, 200, 100)
+        targetText = "ON"
+    else
+        raknet.remove_send_hook(rakhook)
+        targetColor = Color3.fromRGB(255, 60, 60)
+        targetText = "OFF"
+    end
+
+    ToggleBtn.Text = targetText
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(ToggleBtn, tweenInfo, {BackgroundColor3 = targetColor})
+    tween:Play()
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    setHookState(not hooked)
+end)
